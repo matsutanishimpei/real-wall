@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
-import { setCookie } from 'hono/cookie';
+import { setCookie, deleteCookie } from 'hono/cookie';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { users } from '../db/schema';
@@ -54,6 +54,10 @@ authRoute.post('/google', async (c) => {
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
     }, c.env.JWT_SECRET);
 
+    // 古い検証用cookie(path=/api/auth)が残っている場合は削除する
+    deleteCookie(c, 'session_token', { path: '/api/auth' });
+    deleteCookie(c, 'session_token', { path: '/api/auth/dev-login' });
+
     // Cookieにセット
     setCookie(c, 'session_token', sessionToken, {
         httpOnly: true,
@@ -99,6 +103,9 @@ authRoute.post('/dev-login', async (c) => {
         id: user.id,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
     }, c.env.JWT_SECRET);
+
+    deleteCookie(c, 'session_token', { path: '/api/auth' });
+    deleteCookie(c, 'session_token', { path: '/api/auth/dev-login' });
 
     setCookie(c, 'session_token', sessionToken, {
         httpOnly: true,
