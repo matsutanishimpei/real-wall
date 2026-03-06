@@ -13,9 +13,6 @@
 			"database_id": "03c4a31b-1062-4df9-a749-a681add95bf4"
 		}
 	]
-	// "vars": {
-	//   "MY_VAR": "my-variable"
-	// },
 	// "kv_namespaces": [
 	//   {
 	//     "binding": "MY_KV_NAMESPACE",

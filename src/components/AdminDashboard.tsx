@@ -182,6 +182,9 @@ function PromptsPanel({ showToast, askConfirm }: any) {
                 showToast(`保存しました`);
                 setEditing(null);
                 fetchPrompts();
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                showToast(`保存に失敗しました: ${errData.error || res.statusText}`, 'error');
             }
         });
     };
@@ -192,6 +195,8 @@ function PromptsPanel({ showToast, askConfirm }: any) {
             if (res.ok) {
                 showToast('削除しました');
                 fetchPrompts();
+            } else {
+                showToast('削除に失敗しました', 'error');
             }
         });
     };
@@ -275,6 +280,9 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
                 showToast(`制約を保存しました`);
                 setEditing(null);
                 fetchConstraints();
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                showToast(`保存に失敗しました: ${errData.error || res.statusText}`, 'error');
             }
         });
     };
@@ -285,6 +293,8 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
             if (res.ok) {
                 showToast('削除しました');
                 fetchConstraints();
+            } else {
+                showToast('削除に失敗しました', 'error');
             }
         });
     };

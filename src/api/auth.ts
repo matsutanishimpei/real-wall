@@ -60,6 +60,7 @@ authRoute.post('/google', async (c) => {
         secure: true,   // 本番時は https: 必須
         sameSite: 'Lax',
         maxAge: 60 * 60 * 24 * 7,
+        path: '/',
     });
 
     return c.json({ message: 'Login successful', user });
@@ -101,9 +102,10 @@ authRoute.post('/dev-login', async (c) => {
 
     setCookie(c, 'session_token', sessionToken, {
         httpOnly: true,
-        secure: false, // 開発環境を考慮してfalse (https環境ならtrue)
+        secure: true, // Cloudflare Pages is https
         sameSite: 'Lax',
         maxAge: 60 * 60 * 24 * 7,
+        path: '/',
     });
 
     return c.json({ message: 'Dev Login successful', user });
