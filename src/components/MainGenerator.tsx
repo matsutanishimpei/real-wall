@@ -264,7 +264,7 @@ ${selectedDescriptions.map(c => '- ' + c).join('\n')}
 
     return (
         <div className="bg-slate-50 min-h-[calc(100vh-4rem)] p-6 pt-20">
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(340px,1fr)_220px_minmax(340px,1fr)] gap-6 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(340px,1fr)_160px_minmax(340px,1fr)] gap-6 items-stretch">
                 {/* ===== 左カラム: 入力と制約選択 ===== */}
                 <div className="flex flex-col space-y-6 min-w-0">
 
@@ -331,24 +331,26 @@ ${selectedDescriptions.map(c => '- ' + c).join('\n')}
                         <button
                             onClick={handleGeneratePrompt}
                             disabled={!requirements || !selectedPromptId || selectedConstraintIds.length === 0}
-                            className={`w-full flex-1 rounded-2xl shadow-md transition-all px-4 py-6 text-center ${(!requirements || !selectedPromptId || selectedConstraintIds.length === 0)
+                            className={`w-full flex-1 rounded-2xl shadow-md transition-all px-2 py-6 ${(!requirements || !selectedPromptId || selectedConstraintIds.length === 0)
                                     ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                                     : 'bg-gradient-to-b from-teal-600 to-blue-600 text-white hover:opacity-90 active:scale-[0.98]'
                                 }`}
                         >
-                            <span className="h-full w-full flex flex-col items-center justify-center gap-2">
-                                <span className="flex items-center gap-2 text-lg font-extrabold leading-tight">
+                            <span className="h-full w-full flex flex-col items-center justify-center gap-3">
+                                <span className="flex items-center justify-center">
                                     <svg
                                         aria-hidden="true"
                                         viewBox="0 0 20 20"
-                                        className="w-5 h-5 shrink-0"
+                                        className="w-6 h-6 shrink-0"
                                         fill="currentColor"
                                     >
                                         <path d="M7.5 4.5v11l9-5.5-9-5.5Z" />
                                     </svg>
-                                    <span>プロンプトを生成・コピー</span>
                                 </span>
-                                <span className="text-xs font-semibold leading-snug opacity-95">
+                                <span className="[writing-mode:vertical-rl] [text-orientation:upright] text-lg font-extrabold leading-none tracking-[0.08em]">
+                                    プロンプトを生成・コピー
+                                </span>
+                                <span className="[writing-mode:vertical-rl] [text-orientation:upright] text-[10px] font-semibold leading-none opacity-95 tracking-[0.06em]">
                                     要件・壁（制約）を入力して押してください
                                 </span>
                             </span>
