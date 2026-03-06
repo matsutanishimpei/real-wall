@@ -331,23 +331,34 @@ ${selectedDescriptions.map(c => '- ' + c).join('\n')}
                         <button
                             onClick={handleGeneratePrompt}
                             disabled={!requirements || !selectedPromptId || selectedConstraintIds.length === 0}
-                            className={`w-full flex-1 rounded-2xl font-bold text-lg shadow-md transition-all px-4 py-6 text-center whitespace-pre-wrap ${(!requirements || !selectedPromptId || selectedConstraintIds.length === 0)
+                            className={`w-full flex-1 rounded-2xl shadow-md transition-all px-4 py-6 text-center ${(!requirements || !selectedPromptId || selectedConstraintIds.length === 0)
                                     ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                                     : 'bg-gradient-to-b from-teal-600 to-blue-600 text-white hover:opacity-90 active:scale-[0.98]'
                                 }`}
                         >
-                            プロンプトを生成・コピー
+                            <span className="h-full w-full flex flex-col items-center justify-center gap-2">
+                                <span className="flex items-center gap-2 text-lg font-extrabold leading-tight">
+                                    <svg
+                                        aria-hidden="true"
+                                        viewBox="0 0 20 20"
+                                        className="w-5 h-5 shrink-0"
+                                        fill="currentColor"
+                                    >
+                                        <path d="M7.5 4.5v11l9-5.5-9-5.5Z" />
+                                    </svg>
+                                    <span>プロンプトを生成・コピー</span>
+                                </span>
+                                <span className="text-xs font-semibold leading-snug opacity-95">
+                                    要件・壁（制約）を入力して押してください
+                                </span>
+                            </span>
                         </button>
 
                         <div className="mt-3 min-h-[2.75rem] text-center">
-                            {isCopied ? (
+                            {isCopied && (
                                 <div className="text-teal-600 font-bold animate-pulse text-sm">
                                     ✅ コピーしました
                                     <div className="text-xs text-slate-500 font-semibold mt-1">LLMに貼り付けてください</div>
-                                </div>
-                            ) : (
-                                <div className="text-xs text-slate-500 font-semibold">
-                                    要件・壁（制約）を入力して押してください
                                 </div>
                             )}
                         </div>
