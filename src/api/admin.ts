@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { users, basePrompts, slotConstraints, outputLogs } from '../db/schema';
+import { users, basePrompts, constraints, outputLogs } from '../db/schema';
 import { requireAuth, requireAdmin } from './middleware';
 import type { Bindings, Variables } from '../types';
 
@@ -106,28 +106,28 @@ adminRoute.delete('/prompts/:id', async (c) => {
 });
 
 // ==========================================
-// Constraints 管理 (slotConstraints)
+// Constraints 管理 (constraints)
 // ==========================================
 adminRoute.get('/constraints', async (c) => {
     const db = drizzle(c.env.DB);
-    const constraints = await db.select().from(slotConstraints);
-    return c.json({ constraints });
+    const constraintsList = await db.select().from(constraints);
+    return c.json({ constraints: constraintsList });
 });
 
 adminRoute.post('/constraints', async (c) => {
-    const { category, description } = await c.req.json();
+    const { mainCategory, subCategory, detailCategory, description } = await c.req.json();
     const db = drizzle(c.env.DB);
-    const [newConstraint] = await db.insert(slotConstraints).values({ category, description }).returning();
+    const [newConstraint] = await db.insert(constraints).values({ mainCategory, subCategory, detailCategory, description }).returning();
     return c.json({ constraint: newConstraint });
 });
 
 adminRoute.put('/constraints/:id', async (c) => {
     const id = c.req.param('id');
-    const { category, description } = await c.req.json();
+    const { mainCategory, subCategory, detailCategory, description } = await c.req.json();
     const db = drizzle(c.env.DB);
-    const [updatedConstraint] = await db.update(slotConstraints)
-        .set({ category, description })
-        .where(eq(slotConstraints.id, id))
+    const [updatedConstraint] = await db.update(constraints)
+        .set({ mainCategory, subCategory, detailCategory, description })
+        .where(eq(constraints.id, id))
         .returning();
     return c.json({ constraint: updatedConstraint });
 });
@@ -135,6 +135,6 @@ adminRoute.put('/constraints/:id', async (c) => {
 adminRoute.delete('/constraints/:id', async (c) => {
     const id = c.req.param('id');
     const db = drizzle(c.env.DB);
-    await db.delete(slotConstraints).where(eq(slotConstraints.id, id));
+    await db.delete(constraints).where(eq(constraints.id, id));
     return c.json({ success: true });
 });

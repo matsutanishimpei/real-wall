@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { requireAuth } from './middleware';
 import { drizzle } from 'drizzle-orm/d1';
-import { basePrompts, slotConstraints } from '../db/schema';
+import { basePrompts, constraints } from '../db/schema';
 import type { Bindings, Variables } from '../types';
 
 export const generateRoute = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -13,6 +13,6 @@ generateRoute.use('*', requireAuth);
 generateRoute.get('/config', async (c) => {
   const db = drizzle(c.env.DB);
   const prompts = await db.select().from(basePrompts);
-  const constraints = await db.select().from(slotConstraints);
-  return c.json({ prompts, constraints });
+  const constraintsList = await db.select().from(constraints);
+  return c.json({ prompts, constraints: constraintsList });
 });

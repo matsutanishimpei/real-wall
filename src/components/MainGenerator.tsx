@@ -39,7 +39,8 @@ export default function MainGenerator({ user }: { user: any }) {
 
     const groupedConstraints = useMemo(() => {
         return constraints.reduce((acc, curr) => {
-            (acc[curr.category] = acc[curr.category] || []).push(curr);
+            const key = [curr.mainCategory, curr.subCategory].filter(Boolean).join(' / ') || 'Uncategorized';
+            (acc[key] = acc[key] || []).push(curr);
             return acc;
         }, {} as Record<string, any[]>);
     }, [constraints]);
@@ -310,7 +311,12 @@ ${filledTemplate}
                                                     onChange={() => handleToggleConstraint(item.id)}
                                                     className="mt-1 w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
                                                 />
-                                                <span className="text-sm text-slate-700 group-hover:text-slate-900 leading-snug">{item.description}</span>
+                                                <span className="text-sm text-slate-700 group-hover:text-slate-900 leading-snug">
+                                                    <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 mr-2">
+                                                        {item.detailCategory}
+                                                    </span>
+                                                    <span>{item.description}</span>
+                                                </span>
                                             </label>
                                         ))}
                                     </div>

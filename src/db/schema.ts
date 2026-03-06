@@ -24,9 +24,11 @@ export const basePrompts = sqliteTable('base_prompts', {
 });
 
 // 3. カテゴリを持つ制約マスター
-export const slotConstraints = sqliteTable('slot_constraints', {
+export const constraints = sqliteTable('constraints', {
     id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-    category: text('category').notNull(),
+    mainCategory: text('main_category').notNull(),
+    subCategory: text('sub_category').notNull(),
+    detailCategory: text('detail_category').notNull(),
     description: text('description').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),

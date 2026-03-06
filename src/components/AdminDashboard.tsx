@@ -257,7 +257,8 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
     // カテゴリごとにグループ化
     const grouped = useMemo(() => {
         return constraints.reduce((acc, curr) => {
-            (acc[curr.category] = acc[curr.category] || []).push(curr);
+            const key = [curr.mainCategory, curr.subCategory].filter(Boolean).join(' / ') || 'Uncategorized';
+            (acc[key] = acc[key] || []).push(curr);
             return acc;
         }, {} as Record<string, any[]>);
     }, [constraints]);
@@ -265,7 +266,9 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
     const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
-        const category = fd.get('category') as string;
+        const mainCategory = fd.get('mainCategory') as string;
+        const subCategory = fd.get('subCategory') as string;
+        const detailCategory = fd.get('detailCategory') as string;
         const description = fd.get('description') as string;
 
         askConfirm(`制約を保存しますか？`, async () => {
@@ -274,7 +277,7 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
             const res = await fetch(url, {
                 method: isNew ? 'POST' : 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ category, description })
+                body: JSON.stringify({ mainCategory, subCategory, detailCategory, description })
             });
             if (res.ok) {
                 showToast(`制約を保存しました`);
@@ -302,7 +305,7 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
     return (
         <div className="space-y-6">
             <div className="flex pl-1">
-                <button onClick={() => setEditing({ category: '', description: '' })} className="bg-teal-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-teal-700 shadow-sm transition">
+                <button onClick={() => setEditing({ mainCategory: '', subCategory: '', detailCategory: '', description: '' })} className="bg-teal-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-teal-700 shadow-sm transition">
                     + 新規制約を作成
                 </button>
             </div>
@@ -311,7 +314,11 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
                 <form onSubmit={handleSave} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-fade-in-up">
                     <h3 className="font-bold text-lg mb-4">{editing.id ? '制約の編集' : '新規制約'}</h3>
                     <div className="space-y-4">
-                        <input required name="category" defaultValue={editing.category} placeholder="カテゴリ (例: SECURITY, UI)" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input required name="mainCategory" defaultValue={editing.mainCategory} placeholder="Main Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                            <input required name="subCategory" defaultValue={editing.subCategory} placeholder="Sub Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                            <input required name="detailCategory" defaultValue={editing.detailCategory} placeholder="Detail Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                        </div>
                         <textarea required name="description" defaultValue={editing.description} rows={3} placeholder="制約内容..." className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
                         <div className="flex justify-end space-x-2 pt-2">
                             <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded">キャンセル</button>
@@ -332,7 +339,12 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
                         <ul className="divide-y divide-slate-100">
                             {(items as any[]).map(item => (
                                 <li key={item.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
-                                    <p className="text-slate-700">{item.description}</p>
+                                    <div className="text-slate-700">
+                                        <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 mr-2">
+                                            {item.detailCategory}
+                                        </span>
+                                        <span>{item.description}</span>
+                                    </div>
                                     <div className="opacity-0 group-hover:opacity-100 transition flex space-x-3 ml-4">
                                         <button onClick={() => setEditing(item)} className="text-blue-500 text-sm hover:underline">編集</button>
                                         <button onClick={() => handleDelete(item.id)} className="text-red-500 text-sm hover:underline">削除</button>
