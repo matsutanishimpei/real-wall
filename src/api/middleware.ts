@@ -13,7 +13,7 @@ export const requireAuth: MiddlewareHandler<{ Bindings: Bindings; Variables: Var
     if (!token) return c.json({ error: 'Unauthorized' }, 401);
 
     try {
-        const payload = await verify(token, c.env.JWT_SECRET);
+        const payload = await verify(token, c.env.JWT_SECRET, "HS256");
         const db = drizzle(c.env.DB);
 
         // 毎回DBから最新のユーザー状態を取得（権限剥奪や無効化を即座に反映させるため）
@@ -30,8 +30,7 @@ export const requireAuth: MiddlewareHandler<{ Bindings: Bindings; Variables: Var
         c.set('user', user);
         await next();
     } catch (err) {
-        console.error('requireAuth caught an error:', err);
-        return c.json({ error: 'Invalid or expired token', detail: String(err) }, 401);
+        return c.json({ error: 'Invalid or expired token' }, 401);
     }
 };
 

@@ -17,7 +17,7 @@ authRoute.post('/google', async (c) => {
     if (!verifyRes.ok) {
         return c.json({ error: 'Invalid Google token' }, 401);
     }
-    const payload = await verifyRes.json<{ email: string; email_verified: string; name: string }>();
+    const payload = (await verifyRes.json()) as { email: string; email_verified: string; name: string };
 
     if (payload.email_verified !== 'true') return c.json({ error: 'Email not verified' }, 401);
 
