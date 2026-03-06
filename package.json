@@ -9,11 +9,19 @@
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
-    "hono": "^4.12.5"
+    "@pdf-lib/fontkit": "^1.1.1",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.12.5",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260305.1",
     "@hono/vite-build": "^1.2.0",
     "@hono/vite-dev-server": "^0.18.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.9",
+    "typescript": "^5.9.3",
     "vite": "^6.3.5",
     "wrangler": "^4.4.0"
   }
