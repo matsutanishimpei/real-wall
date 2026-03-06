@@ -39,7 +39,7 @@ export default function MainGenerator({ user }: { user: any }) {
 
     const groupedConstraints = useMemo(() => {
         return constraints.reduce((acc, curr) => {
-            const key = [curr.mainCategory, curr.subCategory].filter(Boolean).join(' / ') || 'Uncategorized';
+            const key = [curr.mainCategory ?? curr.main_category, curr.subCategory ?? curr.sub_category].filter(Boolean).join(' / ') || 'Uncategorized';
             (acc[key] = acc[key] || []).push(curr);
             return acc;
         }, {} as Record<string, any[]>);

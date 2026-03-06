@@ -257,7 +257,7 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
     // カテゴリごとにグループ化
     const grouped = useMemo(() => {
         return constraints.reduce((acc, curr) => {
-            const key = [curr.mainCategory, curr.subCategory].filter(Boolean).join(' / ') || 'Uncategorized';
+            const key = [curr.mainCategory ?? curr.main_category, curr.subCategory ?? curr.sub_category].filter(Boolean).join(' / ') || 'Uncategorized';
             (acc[key] = acc[key] || []).push(curr);
             return acc;
         }, {} as Record<string, any[]>);
@@ -315,9 +315,9 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
                     <h3 className="font-bold text-lg mb-4">{editing.id ? '制約の編集' : '新規制約'}</h3>
                     <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <input required name="mainCategory" defaultValue={editing.mainCategory} placeholder="Main Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
-                            <input required name="subCategory" defaultValue={editing.subCategory} placeholder="Sub Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
-                            <input required name="detailCategory" defaultValue={editing.detailCategory} placeholder="Detail Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                            <input required name="mainCategory" defaultValue={editing.mainCategory ?? editing.main_category} placeholder="Main Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                            <input required name="subCategory" defaultValue={editing.subCategory ?? editing.sub_category} placeholder="Sub Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                            <input required name="detailCategory" defaultValue={editing.detailCategory ?? editing.detail_category} placeholder="Detail Category" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
                         </div>
                         <textarea required name="description" defaultValue={editing.description} rows={3} placeholder="制約内容..." className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 focus:outline-none" />
                         <div className="flex justify-end space-x-2 pt-2">
@@ -341,7 +341,7 @@ function ConstraintsPanel({ showToast, askConfirm }: any) {
                                 <li key={item.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
                                     <div className="text-slate-700">
                                         <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 mr-2">
-                                            {item.detailCategory}
+                                            {item.detailCategory ?? item.detail_category}
                                         </span>
                                         <span>{item.description}</span>
                                     </div>

@@ -7,6 +7,18 @@ import type { Bindings, Variables } from '../types';
 
 export const adminRoute = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+function normalizeConstraintRow(row: any) {
+    return {
+        id: row.id,
+        mainCategory: row.mainCategory ?? row.main_category ?? row.category ?? '',
+        subCategory: row.subCategory ?? row.sub_category ?? '',
+        detailCategory: row.detailCategory ?? row.detail_category ?? '',
+        description: row.description ?? '',
+        createdAt: row.createdAt ?? row.created_at,
+        updatedAt: row.updatedAt ?? row.updated_at,
+    };
+}
+
 // 全てのルートでログイン確認＆管理者権限を要求
 adminRoute.use('*', requireAuth, requireAdmin);
 
@@ -111,25 +123,39 @@ adminRoute.delete('/prompts/:id', async (c) => {
 adminRoute.get('/constraints', async (c) => {
     const db = drizzle(c.env.DB);
     const constraintsList = await db.select().from(constraints);
-    return c.json({ constraints: constraintsList });
+    return c.json({ constraints: constraintsList.map(normalizeConstraintRow) });
 });
 
 adminRoute.post('/constraints', async (c) => {
-    const { mainCategory, subCategory, detailCategory, description } = await c.req.json();
+    const body = await c.req.json<any>();
+    const mainCategory = body.mainCategory ?? body.main_category ?? body.category;
+    const subCategory = body.subCategory ?? body.sub_category;
+    const detailCategory = body.detailCategory ?? body.detail_category;
+    const description = body.description;
+    if (!mainCategory || !subCategory || !detailCategory || !description) {
+        return c.json({ error: 'mainCategory/subCategory/detailCategory/description are required' }, 400);
+    }
     const db = drizzle(c.env.DB);
     const [newConstraint] = await db.insert(constraints).values({ mainCategory, subCategory, detailCategory, description }).returning();
-    return c.json({ constraint: newConstraint });
+    return c.json({ constraint: normalizeConstraintRow(newConstraint) });
 });
 
 adminRoute.put('/constraints/:id', async (c) => {
     const id = c.req.param('id');
-    const { mainCategory, subCategory, detailCategory, description } = await c.req.json();
+    const body = await c.req.json<any>();
+    const mainCategory = body.mainCategory ?? body.main_category ?? body.category;
+    const subCategory = body.subCategory ?? body.sub_category;
+    const detailCategory = body.detailCategory ?? body.detail_category;
+    const description = body.description;
+    if (!mainCategory || !subCategory || !detailCategory || !description) {
+        return c.json({ error: 'mainCategory/subCategory/detailCategory/description are required' }, 400);
+    }
     const db = drizzle(c.env.DB);
     const [updatedConstraint] = await db.update(constraints)
         .set({ mainCategory, subCategory, detailCategory, description })
         .where(eq(constraints.id, id))
         .returning();
-    return c.json({ constraint: updatedConstraint });
+    return c.json({ constraint: normalizeConstraintRow(updatedConstraint) });
 });
 
 adminRoute.delete('/constraints/:id', async (c) => {

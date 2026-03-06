@@ -6,6 +6,18 @@ import type { Bindings, Variables } from '../types';
 
 export const generateRoute = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+function normalizeConstraintRow(row: any) {
+  return {
+    id: row.id,
+    mainCategory: row.mainCategory ?? row.main_category ?? row.category ?? '',
+    subCategory: row.subCategory ?? row.sub_category ?? '',
+    detailCategory: row.detailCategory ?? row.detail_category ?? '',
+    description: row.description ?? '',
+    createdAt: row.createdAt ?? row.created_at,
+    updatedAt: row.updatedAt ?? row.updated_at,
+  };
+}
+
 // ログインユーザーのみAI生成可能（※UIでのマスターデータ取得等）
 generateRoute.use('*', requireAuth);
 
@@ -14,5 +26,5 @@ generateRoute.get('/config', async (c) => {
   const db = drizzle(c.env.DB);
   const prompts = await db.select().from(basePrompts);
   const constraintsList = await db.select().from(constraints);
-  return c.json({ prompts, constraints: constraintsList });
+  return c.json({ prompts, constraints: constraintsList.map(normalizeConstraintRow) });
 });
