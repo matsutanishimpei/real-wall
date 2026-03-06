@@ -30,7 +30,8 @@ export const requireAuth: MiddlewareHandler<{ Bindings: Bindings; Variables: Var
         c.set('user', user);
         await next();
     } catch (err) {
-        return c.json({ error: 'Invalid or expired token' }, 401);
+        console.error('requireAuth caught an error:', err);
+        return c.json({ error: 'Invalid or expired token', detail: String(err) }, 401);
     }
 };
 

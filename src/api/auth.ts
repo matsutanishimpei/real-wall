@@ -108,5 +108,5 @@ authRoute.post('/dev-login', async (c) => {
         path: '/',
     });
 
-    return c.json({ message: 'Dev Login successful', user });
+    return c.json({ message: 'Dev Login successful', user, debug_secret_exists: !!c.env.JWT_SECRET });
 });
