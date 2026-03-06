@@ -55,18 +55,16 @@ export default function MainGenerator({ user }: { user: any }) {
 
         const promptTemplate = prompts.find(p => p.id === selectedPromptId)?.content || '';
         const selectedDescriptions = constraints.filter(c => selectedConstraintIds.includes(c.id)).map(c => c.description);
+        const constraintsText = selectedDescriptions.join(', ');
+        const filledTemplate = promptTemplate
+            .replace(/{{\s*constraints\s*}}/g, constraintsText)
+            .replace(/{{\s*old_requirements\s*}}/g, requirements);
 
         const promptText = `
 以下の要件と制約に基づき、設計の検討内容と新しいシステム要件を生成してください。
 
-【プロンプトテンプレート】
-${promptTemplate}
-
-【ユーザーからの要件】
-${requirements}
-
-【適用する制約一覧】
-${selectedDescriptions.map(c => '- ' + c).join('\n')}
+【プロンプト】
+${filledTemplate}
 
 出力は必ず以下のJSONスキーマに従うこと。
 \`\`\`json
@@ -348,10 +346,7 @@ ${selectedDescriptions.map(c => '- ' + c).join('\n')}
                                     </svg>
                                 </span>
                                 <span className="[writing-mode:vertical-rl] [text-orientation:upright] text-lg font-extrabold leading-none tracking-[0.08em]">
-                                    プロンプトを生成・コピー
-                                </span>
-                                <span className="[writing-mode:vertical-rl] [text-orientation:upright] text-[10px] font-semibold leading-none opacity-95 tracking-[0.06em]">
-                                    要件・壁（制約）を入力して押してください
+                                    プロンプトを生成
                                 </span>
                             </span>
                         </button>
@@ -385,7 +380,7 @@ ${selectedDescriptions.map(c => '- ' + c).join('\n')}
 
                 {/* AI結果の貼り付け領域 */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 className="text-lg font-bold text-slate-800 mb-2 border-l-4 border-orange-500 pl-3">STEP 2: LLMの出力 (JSON) を貼り付け</h2>
+                    <h2 className="text-lg font-bold text-slate-800 mb-2 border-l-4 border-orange-500 pl-3">STEP 2: プロンプトから生成されたLLMの出力 (新要件定義JSON) を貼り付け</h2>
                     <textarea
                         value={jsonResult}
                         onChange={e => handleJsonPaste(e.target.value)}
