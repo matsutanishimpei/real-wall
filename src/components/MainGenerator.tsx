@@ -263,100 +263,112 @@ ${selectedDescriptions.map(c => '- ' + c).join('\n')}
     };
 
     return (
-        <div className="flex bg-slate-50 min-h-[calc(100vh-4rem)] p-6 gap-6 pt-20">
-            {/* ===== 左カラム: 入力と制約選択 ===== */}
-            <div className="w-1/2 flex flex-col space-y-6">
+        <div className="bg-slate-50 min-h-[calc(100vh-4rem)] p-6 pt-20">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(340px,1fr)_220px_minmax(340px,1fr)] gap-6 items-stretch">
+                {/* ===== 左カラム: 入力と制約選択 ===== */}
+                <div className="flex flex-col space-y-6 min-w-0">
 
-                {/* プロンプトと要件 */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 className="text-xl font-bold text-slate-800 mb-4 border-l-4 border-teal-500 pl-3">事前準備・要件の入力</h2>
-                    <div className="mb-4">
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">適用するプロンプトマスター</label>
-                        <select
-                            value={selectedPromptId}
-                            onChange={e => setSelectedPromptId(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
-                        >
-                            <option value="" disabled>選択してください</option>
-                            {prompts.map(p => (
-                                <option key={p.id} value={p.id}>{p.title}</option>
-                            ))}
-                        </select>
+                    {/* プロンプトと要件 */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4 border-l-4 border-teal-500 pl-3">事前準備・要件の入力</h2>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">適用するプロンプトマスター</label>
+                            <select
+                                value={selectedPromptId}
+                                onChange={e => setSelectedPromptId(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
+                            >
+                                <option value="" disabled>選択してください</option>
+                                {prompts.map(p => (
+                                    <option key={p.id} value={p.id}>{p.title}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">旧要件のペースト</label>
+                            <textarea
+                                value={requirements}
+                                onChange={e => setRequirements(e.target.value)}
+                                rows={8}
+                                className="w-full p-3 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
+                                placeholder="ここに現在の要件やアイデアを貼り付けてください..."
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">旧要件のペースト</label>
-                        <textarea
-                            value={requirements}
-                            onChange={e => setRequirements(e.target.value)}
-                            rows={6}
-                            className="w-full p-3 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
-                            placeholder="ここに現在の要件やアイデアを貼り付けてください..."
-                        />
-                    </div>
-                </div>
 
-                {/* 制限事項(壁) */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-y-auto max-h-[300px]">
-                    <h2 className="text-xl font-bold text-slate-800 mb-4 border-l-4 border-indigo-500 pl-3">壁 (制約事項)</h2>
-                    <div className="space-y-6">
-                        {Object.entries(groupedConstraints).map(([category, items]) => (
-                            <div key={category}>
-                                <h3 className="font-bold text-sm text-indigo-700 bg-indigo-50 px-3 py-1 rounded inline-block mb-3">{category}</h3>
-                                <div className="space-y-2">
-                                    {items.map(item => (
-                                        <label key={item.id} className="flex items-start space-x-3 cursor-pointer group">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedConstraintIds.includes(item.id)}
-                                                onChange={() => handleToggleConstraint(item.id)}
-                                                className="mt-1 w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
-                                            />
-                                            <span className="text-sm text-slate-700 group-hover:text-slate-900 leading-snug">{item.description}</span>
-                                        </label>
-                                    ))}
+                    {/* 制限事項(壁) */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-y-auto min-h-[260px]">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4 border-l-4 border-indigo-500 pl-3">壁 (制約事項)</h2>
+                        <div className="space-y-6">
+                            {Object.entries(groupedConstraints).map(([category, items]) => (
+                                <div key={category}>
+                                    <h3 className="font-bold text-sm text-indigo-700 bg-indigo-50 px-3 py-1 rounded inline-block mb-3">{category}</h3>
+                                    <div className="space-y-2">
+                                        {items.map(item => (
+                                            <label key={item.id} className="flex items-start space-x-3 cursor-pointer group">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedConstraintIds.includes(item.id)}
+                                                    onChange={() => handleToggleConstraint(item.id)}
+                                                    className="mt-1 w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
+                                                />
+                                                <span className="text-sm text-slate-700 group-hover:text-slate-900 leading-snug">{item.description}</span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                        {constraints.length === 0 && <p className="text-slate-500 text-sm">制約マスターが登録されていません。</p>}
+                            ))}
+                            {constraints.length === 0 && <p className="text-slate-500 text-sm">制約マスターが登録されていません。</p>}
+                        </div>
+                    </div>
+
+                </div>
+
+                {/* ===== 中央カラム: STEP1ボタン（縦長） ===== */}
+                <div className="min-w-0">
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">STEP 1</div>
+                        <button
+                            onClick={handleGeneratePrompt}
+                            disabled={!requirements || !selectedPromptId || selectedConstraintIds.length === 0}
+                            className={`w-full flex-1 rounded-2xl font-bold text-lg shadow-md transition-all px-4 py-6 text-center whitespace-pre-wrap ${(!requirements || !selectedPromptId || selectedConstraintIds.length === 0)
+                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                    : 'bg-gradient-to-b from-teal-600 to-blue-600 text-white hover:opacity-90 active:scale-[0.98]'
+                                }`}
+                        >
+                            プロンプトを生成・コピー
+                        </button>
+
+                        <div className="mt-3 min-h-[2.75rem] text-center">
+                            {isCopied ? (
+                                <div className="text-teal-600 font-bold animate-pulse text-sm">
+                                    ✅ コピーしました
+                                    <div className="text-xs text-slate-500 font-semibold mt-1">LLMに貼り付けてください</div>
+                                </div>
+                            ) : (
+                                <div className="text-xs text-slate-500 font-semibold">
+                                    要件・壁（制約）を入力して押してください
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* プロンプト生成ボタン */}
-                <button
-                    onClick={handleGeneratePrompt}
-                    disabled={!requirements || selectedConstraintIds.length === 0}
-                    className={`w-full py-4 rounded-2xl font-bold text-xl shadow-md transition-all ${(!requirements || selectedConstraintIds.length === 0)
-                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-teal-600 to-blue-600 text-white hover:opacity-90 active:scale-[0.98]'
-                        }`}
-                >
-                    STEP 1: プロンプトを生成・コピー
-                </button>
-
-                {isCopied && (
-                    <div className="text-center text-teal-600 font-bold animate-pulse">
-                        ✅ クリップボードにコピーしました！LLMに貼り付けてください。
-                    </div>
-                )}
-
-            </div>
-
-            {/* ===== 右カラム: プロンプトプレビュー＆結果入力・プレビュー ===== */}
-            <div className="w-1/2 flex flex-col space-y-6">
+                {/* ===== 右カラム: 生成プロンプト＆STEP2＆プレビュー ===== */}
+                <div className="flex flex-col space-y-6 min-w-0">
 
                 {/* 生成されたプロンプト */}
-                {generatedPrompt && (
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                        <h2 className="text-lg font-bold text-slate-800 mb-2 border-l-4 border-blue-500 pl-3">生成されたプロンプト (手動コピー用)</h2>
-                        <textarea
-                            readOnly
-                            value={generatedPrompt}
-                            rows={8}
-                            className="w-full p-3 border border-slate-100 bg-slate-50 text-slate-600 rounded text-sm focus:outline-none"
-                            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                        />
-                    </div>
-                )}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 className="text-lg font-bold text-slate-800 mb-2 border-l-4 border-blue-500 pl-3">生成されたプロンプト (手動コピー用)</h2>
+                    <textarea
+                        readOnly
+                        value={generatedPrompt}
+                        rows={8}
+                        className="w-full p-3 border border-slate-100 bg-slate-50 text-slate-600 rounded text-sm focus:outline-none"
+                        placeholder="STEP 1 を押すとここに生成プロンプトが表示されます（クリックで全選択）"
+                        onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                    />
+                </div>
 
                 {/* AI結果の貼り付け領域 */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -418,6 +430,7 @@ ${selectedDescriptions.map(c => '- ' + c).join('\n')}
                     </div>
                 )}
 
+                </div>
             </div>
         </div>
     );
