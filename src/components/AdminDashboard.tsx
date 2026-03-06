@@ -41,8 +41,8 @@ export default function AdminDashboard({ currentUserId }: { currentUserId: strin
     const askConfirm = (message: string, action: () => void) => setConfirm({ isOpen: true, message, action });
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div className="min-h-[calc(100vh-4rem)] bg-slate-50 text-slate-800 font-sans pt-16">
+            <header className="bg-white border-b border-slate-200 sticky top-16 z-30 shadow-sm">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-blue-600">
                         ワクワク試作室 : Admin Dashboard
