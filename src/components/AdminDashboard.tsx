@@ -5,7 +5,7 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     const bg = type === 'success' ? 'bg-teal-600' : 'bg-red-500';
     return (
-        <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-3 rounded-lg shadow-lg font-medium tracking-wide animate-fade-in-up z-50`}>
+        <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-3 rounded-lg shadow-lg font-medium tracking-wide animate-fade-in-up z-[200]`}>
             {message}
         </div>
     );
@@ -14,7 +14,7 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 const ConfirmDialog = ({ isOpen, message, onConfirm, onCancel }: any) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[200] backdrop-blur-sm">
             <div className="bg-white rounded-2xl p-6 w-96 shadow-2xl space-y-6 animate-scale-in">
                 <h3 className="text-lg font-bold text-slate-800">確認</h3>
                 <p className="text-slate-600">{message}</p>
