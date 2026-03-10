@@ -171,6 +171,7 @@ function PromptsPanel({ showToast, askConfirm }: any) {
         const fd = new FormData(e.currentTarget);
         const title = fd.get('title');
         const content = fd.get('content');
+        const category = fd.get('category');
 
         askConfirm(`プロンプトを${editing?.id ? '更新' : '作成'}しますか？`, async () => {
             const isNew = !editing?.id;
@@ -178,7 +179,7 @@ function PromptsPanel({ showToast, askConfirm }: any) {
             const res = await fetch(url, {
                 method: isNew ? 'POST' : 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, content })
+                body: JSON.stringify({ title, content, category })
             });
             if (res.ok) {
                 showToast(`保存しました`);
@@ -243,9 +244,19 @@ function PromptsPanel({ showToast, askConfirm }: any) {
                                 </button>
                             </div>
                             <div className="p-6 space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">タイトル</label>
-                                    <input required name="title" defaultValue={editing.title} placeholder="例: システム要件定義マスターv1" className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">タイトル</label>
+                                        <input required name="title" defaultValue={editing.title} placeholder="例: システム要件定義マスターv1" className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">用途 (カテゴリ)</label>
+                                        <select name="category" defaultValue={editing.category || 'general'} className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition">
+                                            <option value="general">一般 (General)</option>
+                                            <option value="extraction">Step1: 論点抽出 (Extraction)</option>
+                                            <option value="report">Step2: 報告書生成 (Report)</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">プロンプト本文</label>
@@ -347,7 +358,13 @@ function PromptsPanel({ showToast, askConfirm }: any) {
                         className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer flex flex-col overflow-hidden"
                     >
                         <div className="px-5 py-4 border-b border-slate-50 flex justify-between items-start">
-                            <h4 className="font-bold text-slate-800 group-hover:text-teal-700 transition-colors uppercase tracking-tight">{p.title}</h4>
+                            <div>
+                                <div className="flex items-center space-x-2 mb-1">
+                                    {p.category === 'extraction' && <span className="text-[9px] font-extrabold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase">Step1: 論点</span>}
+                                    {p.category === 'report' && <span className="text-[9px] font-extrabold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded uppercase">Step2: 報告書</span>}
+                                </div>
+                                <h4 className="font-bold text-slate-800 group-hover:text-teal-700 transition-colors uppercase tracking-tight">{p.title}</h4>
+                            </div>
                             <div className="flex space-x-1">
                                 <button
                                     onClick={(e) => handleDuplicate(p, e)}

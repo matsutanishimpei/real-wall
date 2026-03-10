@@ -2,22 +2,53 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 
+// Interface definitions
+interface DesignIssue {
+    id: string;
+    title: string;
+    optA: string;
+    optB: string;
+    hint: string;
+}
+
+interface Deliberation {
+    selectedOption: string;
+    differentiator: string;
+    expectedFeedback: string;
+    tradeoffDecision: string;
+}
+
+type Phase = 'INPUT' | 'ISSUES' | 'DELIBERATION' | 'RESULT';
+
 export default function MainGenerator({ user }: { user: any }) {
+    // --- Basic States ---
+    const [phase, setPhase] = useState<Phase>('INPUT');
     const [requirements, setRequirements] = useState('');
     const [prompts, setPrompts] = useState<any[]>([]);
     const [constraints, setConstraints] = useState<any[]>([]);
-    const [selectedPromptId, setSelectedPromptId] = useState('');
     const [selectedConstraintIds, setSelectedConstraintIds] = useState<string[]>([]);
 
-    const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
+    // --- Step 1 States (Issue Extraction) ---
+    const [extractionPromptId, setExtractionPromptId] = useState('');
+    const [generatedStep1Prompt, setGeneratedStep1Prompt] = useState('');
+    const [pastedIssuesJSON, setPastedIssuesJSON] = useState('');
+    const [issues, setIssues] = useState<DesignIssue[]>([]);
+    const [issueError, setIssueError] = useState('');
+
+    // --- Step 2 States (Deliberation) ---
+    const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
+    const [delibData, setDelibData] = useState<Record<string, Deliberation>>({});
+    const [reportPromptId, setReportPromptId] = useState('');
+    const [generatedStep2Prompt, setGeneratedStep2Prompt] = useState('');
+    const [pastedReportJSON, setPastedReportJSON] = useState('');
+    const [finalReport, setFinalReport] = useState<any>(null);
+    const [reportError, setReportError] = useState('');
+
+    // --- Others ---
     const [isCopied, setIsCopied] = useState(false);
-
-    const [jsonResult, setJsonResult] = useState('');
-    const [jsonError, setJsonError] = useState('');
-    const [parsedResult, setParsedResult] = useState<{ newRequirements: string; considerations: any[] } | null>(null);
-
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
 
+    // Initial load
     useEffect(() => {
         const fetchConfig = async () => {
             try {
@@ -26,12 +57,15 @@ export default function MainGenerator({ user }: { user: any }) {
                     const data = await res.json();
                     setPrompts(data.prompts || []);
                     setConstraints(data.constraints || []);
-                    if (data.prompts?.length > 0) {
-                        setSelectedPromptId(data.prompts[0].id);
-                    }
+
+                    const extPrompts = data.prompts?.filter((p: any) => p.category === 'extraction');
+                    if (extPrompts?.length > 0) setExtractionPromptId(extPrompts[0].id);
+
+                    const repPrompts = data.prompts?.filter((p: any) => p.category === 'report');
+                    if (repPrompts?.length > 0) setReportPromptId(repPrompts[0].id);
                 }
             } catch (err) {
-                console.error('Failed to load constraints/prompts');
+                console.error('Failed to load config');
             }
         };
         fetchConfig();
@@ -45,125 +79,120 @@ export default function MainGenerator({ user }: { user: any }) {
         }, {} as Record<string, any[]>);
     }, [constraints]);
 
+    // --- Handlers ---
     const handleToggleConstraint = (id: string) => {
-        setSelectedConstraintIds(prev =>
-            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-        );
+        setSelectedConstraintIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
-    const handleGeneratePrompt = () => {
-        if (!requirements || !selectedPromptId) return;
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 3000);
+        });
+    };
 
-        const promptTemplate = prompts.find(p => p.id === selectedPromptId)?.content || '';
+    // Step 1: Generate Extraction Prompt
+    const generateExtractionPrompt = () => {
+        const template = prompts.find(p => p.id === extractionPromptId)?.content || '';
         const selectedDescriptions = constraints.filter(c => selectedConstraintIds.includes(c.id)).map(c => c.description);
         const constraintsText = selectedDescriptions.join(', ');
-        const filledTemplate = promptTemplate
-            .replace(/{{\s*constraints\s*}}/g, constraintsText)
-            .replace(/{{\s*old_requirements\s*}}/g, requirements);
+        const filled = template.replace(/{{\s*constraints\s*}}/g, constraintsText).replace(/{{\s*old_requirements\s*}}/g, requirements);
 
-        const promptText = `
-以下の要件と制約に基づき、設計の検討内容と新しいシステム要件を生成してください。
-
-【プロンプト】
-${filledTemplate}
-
-出力は必ず以下のJSONスキーマに従うこと。
-\`\`\`json
-{
-  "newRequirements": "Markdown形式の要件定義テキスト",
-  "considerations": [
-    {
-      "type": "trade-off または biz-design",
-      "title": "検討内容のタイトル",
-      "content": "詳細な検討内容"
-    }
-  ]
-}
-\`\`\`
-`.trim();
-
-        setGeneratedPrompt(promptText);
-
-        // クリップボードへコピー
-        navigator.clipboard.writeText(promptText)
-            .then(() => {
-                setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 3000);
-            })
-            .catch((err) => {
-                console.error('Failed to copy text: ', err);
-                alert('クリップボードへのコピーに失敗しました。手動でコピーしてください。');
-            });
+        const fullPrompt = `${filled}\n\n出力は必ず以下のJSON形式のリレーショナルデータとして出力してください。デザインの分岐点を5つ提示すること。\n\`\`\`json\n{\n  "issues": [\n    {\n      "title": "論点のタイトル",\n      "optA": "選択肢Aの概要",\n      "optB": "選択肢Bの概要",\n      "hint": "設計上のヒントやトレードオフの視点"\n    }\n  ]\n}\n\`\`\``.trim();
+        setGeneratedStep1Prompt(fullPrompt);
+        copyToClipboard(fullPrompt);
     };
 
-    const handleJsonPaste = (text: string) => {
-        setJsonResult(text);
-        if (!text.trim()) {
-            setParsedResult(null);
-            setJsonError('');
-            return;
-        }
-
+    // Step 1: Paste & Parse Issues
+    const handlePasteIssues = (text: string) => {
+        setPastedIssuesJSON(text);
         try {
-            // MarkDown形式のJSONコードブロックとして貼り付けられた場合の除去処理
-            let cleanText = text.trim();
-            if (cleanText.startsWith('```json')) {
-                cleanText = cleanText.replace(/^```json/, '').replace(/```$/, '').trim();
-            } else if (cleanText.startsWith('```')) {
-                cleanText = cleanText.replace(/^```/, '').replace(/```$/, '').trim();
-            }
+            let clean = text.trim().replace(/^```json/, '').replace(/```$/, '').trim();
+            const parsed = JSON.parse(clean);
+            if (!Array.isArray(parsed.issues)) throw new Error('issues配列が見つかりません');
 
-            const parsed = JSON.parse(cleanText);
-
-            // Zodなどのスキーマ検証がないため手動バリデーション
-            if (typeof parsed !== 'object' || parsed === null) {
-                throw new Error('ルート要素はJSONオブジェクトである必要があります');
-            }
-            if (typeof parsed.newRequirements !== 'string') {
-                throw new Error('newRequirements キーが存在しないか型が不正です (文字列が必要)');
-            }
-            if (!Array.isArray(parsed.considerations)) {
-                throw new Error('considerations キーが存在しないか型が不正です (配列が必要)');
-            }
-
-            for (let i = 0; i < parsed.considerations.length; i++) {
-                const c = parsed.considerations[i];
-                if (!c.type || !['trade-off', 'biz-design'].includes(c.type)) {
-                    throw new Error(`considerations[${i}].type が不正です ("trade-off" または "biz-design" が必要)`);
-                }
-                if (typeof c.title !== 'string') {
-                    throw new Error(`considerations[${i}].title が不正です (文字列が必要)`);
-                }
-                if (typeof c.content !== 'string') {
-                    throw new Error(`considerations[${i}].content が不正です (文字列が必要)`);
-                }
-            }
-
-            setParsedResult(parsed);
-            setJsonError('');
-        } catch (err: any) {
-            setParsedResult(null);
-            setJsonError(`JSONパース・検証エラー: ${err.message || '形式が正しくありません'}`);
+            const issuesWithId = parsed.issues.map((iss: any, idx: number) => ({
+                ...iss,
+                id: `iss-${idx}-${Date.now()}`
+            }));
+            setIssues(issuesWithId);
+            setIssueError('');
+            setPhase('ISSUES');
+        } catch (e: any) {
+            setIssueError(`JSON解析エラー: ${e.message}`);
         }
     };
 
+    // Step 2: Toggle Issue Selection
+    const handleToggleIssue = (id: string) => {
+        setSelectedIssueIds(prev => {
+            if (prev.includes(id)) return prev.filter(x => x !== id);
+            if (prev.length >= 3) return prev; // Limit to 3
+            return [...prev, id];
+        });
+    };
+
+    const updateDelib = (issueId: string, field: keyof Deliberation, value: string) => {
+        setDelibData(prev => ({
+            ...prev,
+            [issueId]: {
+                ...(prev[issueId] || { selectedOption: '', differentiator: '', expectedFeedback: '', tradeoffDecision: '' }),
+                [field]: value
+            }
+        }));
+    };
+
+    // Step 2: Generate Report Prompt
+    const generateReportPrompt = () => {
+        const template = prompts.find(p => p.id === reportPromptId)?.content || '';
+        const selectedDescriptions = constraints.filter(c => selectedConstraintIds.includes(c.id)).map(c => c.description);
+
+        // Build deliberation text
+        const delibSummary = selectedIssueIds.map(id => {
+            const iss = issues.find(i => i.id === id);
+            const data = delibData[id];
+            return `【論点: ${iss?.title}】\n- ユーザーの選択: ${data?.selectedOption}\n- 既存との違い: ${data?.differentiator}\n- 予想フィードバック: ${data?.expectedFeedback}\n- トレードオフ決断: ${data?.tradeoffDecision}`;
+        }).join('\n\n');
+
+        const filled = template
+            .replace(/{{\s*constraints\s*}}/g, selectedDescriptions.join(', '))
+            .replace(/{{\s*old_requirements\s*}}/g, requirements)
+            .replace(/{{\s*deliberations\s*}}/g, delibSummary);
+
+        const fullPrompt = `${filled}\n\n出力は必ず以下の5章構成のJSON形式で出力してください。A4で5〜10枚相当の重厚なドキュメントを目指し、各章の内容を詳細に記述すること。\n\`\`\`json\n{\n  "chapter1": "システム要件の概況と設計背景",\n  "chapter2": "設計上の分岐点と代替案の比較検討",\n  "chapter3": "主要な差別化要因と既存システムとの整合性",\n  "chapter4": "ステークホルダーへの公開と予想されるフィードバック",\n  "chapter5": "最終的なアーキテクチャ方針とトレードオフの決断"\n}\n\`\`\``.trim();
+        setGeneratedStep2Prompt(fullPrompt);
+        copyToClipboard(fullPrompt);
+    };
+
+    // Step 2: Paste & Parse Report
+    const handlePasteReport = (text: string) => {
+        setPastedReportJSON(text);
+        try {
+            let clean = text.trim().replace(/^```json/, '').replace(/```$/, '').trim();
+            const parsed = JSON.parse(clean);
+            if (!parsed.chapter1 || !parsed.chapter5) throw new Error('5章構成のJSONではありません');
+            setFinalReport(parsed);
+            setReportError('');
+            setPhase('RESULT');
+        } catch (e: any) {
+            setReportError(`JSON解析エラー: ${e.message}`);
+        }
+    };
+
+    // --- PDF Generation (Enhanced for 5 chapters) ---
     const handleGeneratePDF = async () => {
-        if (!parsedResult) return;
+        if (!finalReport) return;
         setIsPdfGenerating(true);
 
         try {
-            // 1. Doc Content Hash生成 (ドキュメントの内容に紐づく一意なハッシュ・検証ID用)
-            const selectedDescriptions = constraints.filter(c => selectedConstraintIds.includes(c.id)).map(c => c.description);
-            const textToHash = requirements + selectedDescriptions.join('') + parsedResult.newRequirements;
+            const textToHash = requirements + JSON.stringify(finalReport);
             const docHashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(textToHash));
             const docHash = Array.from(new Uint8Array(docHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 8);
 
-            // 2. PDFの作成
             const pdfDoc = await PDFDocument.create();
             pdfDoc.registerFontkit(fontkit);
 
             const fontRes = await fetch('https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf');
-            if (!fontRes.ok) throw new Error('Font download failed');
             const fontBytes = await fontRes.arrayBuffer();
             const customFont = await pdfDoc.embedFont(fontBytes);
 
@@ -189,261 +218,399 @@ ${filledTemplate}
             const { width, height } = page.getSize();
             let y = height - 50;
 
-            const drawText = (text: string, size: number) => {
+            const drawText = (text: string, size: number, isTitle = false) => {
+                const color = isTitle ? { r: 0.1, g: 0.3, b: 0.3 } : { r: 0.2, g: 0.2, b: 0.2 };
                 const lines = wrapText(text, width - 100, size);
                 for (const line of lines) {
-                    if (y < 50) {
+                    if (y < 60) {
                         page = pdfDoc.addPage();
                         y = height - 50;
-                        page.drawText(`Verification Hash (Doc): ${docHash}`, { x: 50, y: 30, size: 8, font: customFont });
+                        page.drawText(`Verify: ${docHash}`, { x: width - 80, y: 30, size: 8, font: customFont });
                     }
-                    page.drawText(line, { x: 50, y, size, font: customFont });
+                    page.drawText(line, { x: 50, y, size, font: customFont, color: { type: 'RGB' as any, ...color } as any });
                     y -= size + 5;
                 }
-                y -= 10;
+                y -= 12;
             };
 
-            page.drawText(`Verification Hash (Doc): ${docHash}`, { x: 50, y: 30, size: 8, font: customFont });
+            // Header
+            drawText('リアルウォール：アーキテクチャ設計・要件検討報告書', 20, true);
+            drawText(`発行日: ${new Date().toLocaleDateString('ja-JP')} | 検証ID: ${docHash}`, 9);
+            y -= 20;
 
-            drawText('リアルウォール：アーキテクチャ・要件検討書', 18);
-            drawText(`発行日: ${new Date().toLocaleDateString('ja-JP')}`, 10);
-            drawText('----------------------------------------------------', 12);
+            // Chapters
+            const chapters = [
+                { t: '第1章：システム要件の概況と設計背景', c: finalReport.chapter1 },
+                { t: '第2章：設計上の分岐点と代替案の比較検討', c: finalReport.chapter2 },
+                { t: '第3章：主要な差別化要因と既存システムとの整合性', c: finalReport.chapter3 },
+                { t: '第4章：ステークホルダーへの公開と予想されるフィードバック', c: finalReport.chapter4 },
+                { t: '第5章：最終的なアーキテクチャ方針とトレードオフの決断', c: finalReport.chapter5 },
+            ];
 
-            drawText('■ 元の要件', 14);
-            drawText(requirements, 12);
-
-            drawText('■ 適用されたシステム制約', 14);
-            selectedDescriptions.forEach(d => drawText(`・ ${d}`, 10));
-
-            drawText('----------------------------------------------------', 12);
-            drawText('■ 生成された新要件 (New Requirements)', 14);
-            drawText(parsedResult.newRequirements, 12);
-
-            if (parsedResult.considerations && parsedResult.considerations.length > 0) {
-                drawText('----------------------------------------------------', 12);
-                drawText('■ アーキテクチャ・ビジネス上の検討事項 (Considerations)', 14);
-                parsedResult.considerations.forEach(c => {
-                    drawText(`[${c.type.toUpperCase()}] ${c.title}`, 12);
-                    drawText(c.content, 10);
-                });
-            }
-
-            const pdfFinalBytes = await pdfDoc.save();
-
-            // 3. 真正性担保: 完成版PDFバイナリ全体の File Hash を計算
-            const fileHashBuffer = await crypto.subtle.digest('SHA-256', pdfFinalBytes);
-            const fileHash = Array.from(new Uint8Array(fileHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-            // 4. APIにハッシュを送ってDBに保存 (ログ登録)
-            const saveRes = await fetch('/api/logs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pdfHash: fileHash, considerations: parsedResult.considerations })
+            chapters.forEach(ch => {
+                drawText(ch.t, 14, true);
+                drawText(ch.c, 11);
+                y -= 10;
             });
 
-            if (saveRes.ok) {
-                const blob = new Blob([pdfFinalBytes], { type: 'application/pdf' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Spec_${docHash}.pdf`;
-                a.click();
-                URL.revokeObjectURL(url);
-            } else {
-                alert('PDFハッシュのサーバー保存に失敗しました。');
-            }
+            const pdfBytes = await pdfDoc.save();
+            const fileHashBuffer = await crypto.subtle.digest('SHA-256', pdfBytes);
+            const fileHash = Array.from(new Uint8Array(fileHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-        } catch (err) {
-            console.error(err);
-            alert('PDF作成中にエラーが発生しました');
+            await fetch('/api/logs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pdfHash: fileHash, considerations: [] }) // considerations could be mapped from delibData
+            });
+
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Architectural_Report_${docHash}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+        } catch (e) {
+            console.error(e);
+            alert('PDF出力エラーが発生しました');
         } finally {
             setIsPdfGenerating(false);
         }
     };
 
+    // --- Render Helpers ---
+
     return (
         <div className="bg-slate-50 min-h-[calc(100vh-4rem)] p-6 pt-20">
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(340px,1fr)_160px_minmax(340px,1fr)] gap-6 items-stretch">
-                {/* ===== 左カラム: 入力と制約選択 ===== */}
-                <div className="flex flex-col space-y-6 min-w-0">
+            <div className="max-w-7xl mx-auto">
 
-                    {/* プロンプトと要件 */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                        <h2 className="text-xl font-bold text-slate-800 mb-4 border-l-4 border-teal-500 pl-3">事前準備・要件の入力</h2>
-                        <div className="mb-4">
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">適用するプロンプトマスター</label>
-                            <select
-                                value={selectedPromptId}
-                                onChange={e => setSelectedPromptId(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
-                            >
-                                <option value="" disabled>選択してください</option>
-                                {prompts.map(p => (
-                                    <option key={p.id} value={p.id}>{p.title}</option>
+                {/* Progress Bar */}
+                <div className="flex justify-between items-center mb-8 px-4">
+                    {[
+                        { step: 'INPUT', label: '1. 要件・制約入力' },
+                        { step: 'ISSUES', label: '2. 設計論点の抽出' },
+                        { step: 'DELIBERATION', label: '3. 設計検討・解決' },
+                        { step: 'RESULT', label: '4. 最終報告書' }
+                    ].map((s, i) => (
+                        <React.Fragment key={s.step}>
+                            <div className={`flex items-center space-x-3 transition-all ${phase === s.step ? 'text-teal-600 scale-105 opacity-100' : 'text-slate-400 opacity-60'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${phase === s.step ? 'bg-teal-600 text-white shadow-lg' : 'bg-slate-200 text-slate-500'}`}>{i + 1}</div>
+                                <span className={`text-sm font-bold whitespace-nowrap hidden md:inline`}>{s.label}</span>
+                            </div>
+                            {i < 3 && <div className="flex-1 h-px bg-slate-200 mx-4 hidden md:block"></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+                    {/* ===== LEFT: Main Inputs & Navigation ===== */}
+                    <div className="lg:col-span-4 space-y-6">
+
+                        {/* Requirements & Constraints (Common for Step 1) */}
+                        <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 transition-opacity ${phase !== 'INPUT' ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                <span className="w-1.5 h-6 bg-teal-500 rounded-full mr-3"></span>
+                                基本情報の入力
+                            </h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">旧要件定義のペースト</label>
+                                    <textarea
+                                        value={requirements}
+                                        onChange={e => setRequirements(e.target.value)}
+                                        rows={8}
+                                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm transition"
+                                        placeholder="ここに現在の仕様やドラフト要件を入力してください..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">設計者の選択（論点抽出用プロンプト）</label>
+                                    <select
+                                        value={extractionPromptId}
+                                        onChange={e => setExtractionPromptId(e.target.value)}
+                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                                    >
+                                        {prompts.filter(p => p.category === 'extraction' || p.category === 'general').map(p => (
+                                            <option key={p.id} value={p.id}>{p.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Wall Selection */}
+                        <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 transition-opacity ${phase !== 'INPUT' ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                <span className="w-1.5 h-6 bg-indigo-500 rounded-full mr-3"></span>
+                                壁 (システム制約の適用)
+                            </h2>
+                            <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2">
+                                {Object.entries(groupedConstraints).map(([category, items]) => (
+                                    <div key={category}>
+                                        <h3 className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md inline-block mb-3">{category}</h3>
+                                        <div className="space-y-2">
+                                            {items.map(item => (
+                                                <label key={item.id} className="flex items-start space-x-3 cursor-pointer group">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedConstraintIds.includes(item.id)}
+                                                        onChange={() => handleToggleConstraint(item.id)}
+                                                        className="mt-1 w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500 transition"
+                                                    />
+                                                    <span className="text-xs text-slate-600 group-hover:text-slate-900 leading-snug">
+                                                        <span className="font-bold text-indigo-700 mr-2">[{item.detailCategory}]</span>
+                                                        {item.description}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
                                 ))}
-                            </select>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">旧要件のペースト</label>
-                            <textarea
-                                value={requirements}
-                                onChange={e => setRequirements(e.target.value)}
-                                rows={8}
-                                className="w-full p-3 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
-                                placeholder="ここに現在の要件やアイデアを貼り付けてください..."
-                            />
-                        </div>
+
+                        {/* Reset / Navigation Back */}
+                        {phase !== 'INPUT' && (
+                            <button
+                                onClick={() => setPhase('INPUT')}
+                                className="w-full py-3 border-2 border-dashed border-slate-300 rounded-2xl text-slate-400 font-bold hover:bg-white hover:text-slate-600 transition"
+                            >
+                                ← 最初からやり直す
+                            </button>
+                        )}
                     </div>
 
-                    {/* 制限事項(壁) */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-y-auto min-h-[260px]">
-                        <h2 className="text-xl font-bold text-slate-800 mb-4 border-l-4 border-indigo-500 pl-3">壁 (制約事項)</h2>
-                        <div className="space-y-6">
-                            {Object.entries(groupedConstraints).map(([category, items]) => (
-                                <div key={category}>
-                                    <h3 className="font-bold text-sm text-indigo-700 bg-indigo-50 px-3 py-1 rounded inline-block mb-3">{category}</h3>
-                                    <div className="space-y-2">
-                                        {items.map(item => (
-                                            <label key={item.id} className="flex items-start space-x-3 cursor-pointer group">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedConstraintIds.includes(item.id)}
-                                                    onChange={() => handleToggleConstraint(item.id)}
-                                                    className="mt-1 w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
-                                                />
-                                                <span className="text-sm text-slate-700 group-hover:text-slate-900 leading-snug">
-                                                    <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 mr-2">
-                                                        {item.detailCategory}
-                                                    </span>
-                                                    <span>{item.description}</span>
-                                                </span>
-                                            </label>
-                                        ))}
+                    {/* ===== RIGHT: Step Output & Interaction ===== */}
+                    <div className="lg:col-span-8 space-y-8">
+
+                        {/* Phase 1: Point of Contention Extraction */}
+                        {phase === 'INPUT' && (
+                            <div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col items-center justify-center min-h-[500px] space-y-8 animate-fade-in-up">
+                                <div className="text-center space-y-4">
+                                    <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg className="w-10 h-10 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-slate-800">STEP 1: 論点の抽出</h2>
+                                    <p className="text-slate-500 max-w-md mx-auto">入力された要件とリアルウォールの制約から、設計上のトレードオフや不確実な論点（デザインの分岐点）をAIに抽出させます。</p>
+                                </div>
+
+                                <button
+                                    onClick={generateExtractionPrompt}
+                                    disabled={!requirements || selectedConstraintIds.length === 0}
+                                    className="px-12 py-5 bg-gradient-to-r from-teal-600 to-indigo-600 text-white rounded-2xl font-extrabold text-lg shadow-xl hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 disabled:pointer-events-none"
+                                >
+                                    設計論点を抽出する（プロンプト生成）
+                                </button>
+
+                                {isCopied && (
+                                    <div className="text-teal-600 font-bold animate-pulse text-sm">✅ プロンプトをコピーしました。LLMに貼り付けてください。</div>
+                                )}
+
+                                <div className="w-full space-y-4 pt-8">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">LLMからの出力JSONをペースト</label>
+                                        {issueError && <span className="text-xs text-red-500">{issueError}</span>}
+                                    </div>
+                                    <textarea
+                                        value={pastedIssuesJSON}
+                                        onChange={e => handlePasteIssues(e.target.value)}
+                                        className="w-full p-4 bg-slate-900 text-teal-400 font-mono text-sm rounded-2xl border-2 border-slate-800 focus:border-teal-500 outline-none transition h-40"
+                                        placeholder={`{"issues": [{"title": "...", "optA": "...", "optB": "...", "hint": "..."}]}`}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Phase 2: Design Deliberation (Issues View) */}
+                        {phase === 'ISSUES' && (
+                            <div className="space-y-8 animate-fade-in-up">
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <h2 className="text-3xl font-black text-slate-800 tracking-tight">設計論点の検討</h2>
+                                        <p className="text-slate-500 mt-2">提示された論点から、このプロジェクトで深く検討すべきものを<strong className="text-indigo-600">3つ</strong>選択してください。</p>
+                                    </div>
+                                    <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-sm font-black border border-indigo-100">
+                                        選択中: {selectedIssueIds.length} / 3
                                     </div>
                                 </div>
-                            ))}
-                            {constraints.length === 0 && <p className="text-slate-500 text-sm">制約マスターが登録されていません。</p>}
-                        </div>
-                    </div>
 
-                </div>
-
-                {/* ===== 中央カラム: STEP1ボタン（縦長） ===== */}
-                <div className="min-w-0">
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">STEP 1</div>
-                        <button
-                            onClick={handleGeneratePrompt}
-                            disabled={!requirements || !selectedPromptId || selectedConstraintIds.length === 0}
-                            className={`w-full flex-1 rounded-2xl shadow-md transition-all px-2 py-6 ${(!requirements || !selectedPromptId || selectedConstraintIds.length === 0)
-                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                    : 'bg-gradient-to-b from-teal-600 to-blue-600 text-white hover:opacity-90 active:scale-[0.98]'
-                                }`}
-                        >
-                            <span className="h-full w-full flex flex-col items-center justify-center gap-3">
-                                <span className="flex items-center justify-center">
-                                    <svg
-                                        aria-hidden="true"
-                                        viewBox="0 0 20 20"
-                                        className="w-6 h-6 shrink-0"
-                                        fill="currentColor"
-                                    >
-                                        <path d="M7.5 4.5v11l9-5.5-9-5.5Z" />
-                                    </svg>
-                                </span>
-                                <span className="[writing-mode:vertical-rl] [text-orientation:upright] text-lg font-extrabold leading-none tracking-[0.08em]">
-                                    プロンプトを生成
-                                </span>
-                            </span>
-                        </button>
-
-                        <div className="mt-3 min-h-[2.75rem] text-center">
-                            {isCopied && (
-                                <div className="text-teal-600 font-bold animate-pulse text-sm">
-                                    ✅ コピーしました
-                                    <div className="text-xs text-slate-500 font-semibold mt-1">LLMに貼り付けてください</div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ===== 右カラム: 生成プロンプト＆STEP2＆プレビュー ===== */}
-                <div className="flex flex-col space-y-6 min-w-0">
-
-                {/* 生成されたプロンプト */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 className="text-lg font-bold text-slate-800 mb-2 border-l-4 border-blue-500 pl-3">生成されたプロンプト (手動コピー用)</h2>
-                    <textarea
-                        readOnly
-                        value={generatedPrompt}
-                        rows={8}
-                        className="w-full p-3 border border-slate-100 bg-slate-50 text-slate-600 rounded text-sm focus:outline-none"
-                        placeholder="STEP 1 を押すとここに生成プロンプトが表示されます（クリックで全選択）"
-                        onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                    />
-                </div>
-
-                {/* AI結果の貼り付け領域 */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 className="text-lg font-bold text-slate-800 mb-2 border-l-4 border-orange-500 pl-3">STEP 2: プロンプトから生成されたLLMの出力 (新要件定義JSON) を貼り付け</h2>
-                    <textarea
-                        value={jsonResult}
-                        onChange={e => handleJsonPaste(e.target.value)}
-                        rows={8}
-                        className={`w-full p-3 border rounded focus:ring-2 focus:outline-none text-sm font-mono ${jsonError ? 'border-red-400 focus:ring-red-500' : 'border-slate-300 focus:ring-orange-500'
-                            }`}
-                        placeholder={`{"newRequirements": "...", "considerations": [...]}`}
-                    />
-                    {jsonError && (
-                        <p className="text-red-500 text-sm mt-2 font-bold">{jsonError}</p>
-                    )}
-                </div>
-
-                {/* プレビューとPDF生成 */}
-                {parsedResult && (
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-y-auto">
-                        <div className="space-y-8 animate-fade-in-up">
-                            <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <h2 className="text-lg font-bold text-slate-800">パース成功 / プレビュー</h2>
-                                <button
-                                    onClick={handleGeneratePDF}
-                                    disabled={isPdfGenerating}
-                                    className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg font-medium shadow-sm transition disabled:opacity-50 flex items-center"
-                                >
-                                    {isPdfGenerating ? 'PDF作成中...' : 'PDFを発行（検証ハッシュ付）'}
-                                </button>
-                            </div>
-
-                            <div>
-                                <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">新要件 (New Requirements)</h3>
-                                <div className="prose prose-sm text-slate-700 max-w-none whitespace-pre-wrap">
-                                    {parsedResult.newRequirements}
-                                </div>
-                            </div>
-
-                            {parsedResult.considerations && parsedResult.considerations.length > 0 && (
-                                <div>
-                                    <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">検討内容 (Considerations)</h3>
-                                    <div className="space-y-4">
-                                        {parsedResult.considerations.map((c, idx) => (
-                                            <div key={idx} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                <div className="flex items-center space-x-2 mb-2">
-                                                    <span className={`text-xs font-bold px-2 py-1 rounded ${c.type === 'trade-off' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                        {c.type.toUpperCase()}
-                                                    </span>
-                                                    <h4 className="font-bold text-slate-800">{c.title}</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {issues.map(iss => (
+                                        <div
+                                            key={iss.id}
+                                            onClick={() => handleToggleIssue(iss.id)}
+                                            className={`p-6 rounded-3xl border-2 transition-all cursor-pointer group hover:bg-white ${selectedIssueIds.includes(iss.id) ? 'bg-white border-teal-500 shadow-xl' : 'bg-slate-100/50 border-transparent hover:border-slate-300'}`}
+                                        >
+                                            <div className="flex justify-between items-start mb-4">
+                                                <h3 className="font-bold text-slate-800 group-hover:text-teal-700 transition-colors uppercase tracking-tight">{iss.title}</h3>
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${selectedIssueIds.includes(iss.id) ? 'bg-teal-500 border-teal-500' : 'border-slate-300'}`}>
+                                                    {selectedIssueIds.includes(iss.id) && <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" /></svg>}
                                                 </div>
-                                                <p className="text-sm text-slate-600">{c.content}</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                                <div className="p-3 bg-white/50 rounded-xl border border-slate-100 text-[11px] font-bold text-slate-500"><span className="text-indigo-500 block mb-1">Option A</span> {iss.optA}</div>
+                                                <div className="p-3 bg-white/50 rounded-xl border border-slate-100 text-[11px] font-bold text-slate-500"><span className="text-indigo-500 block mb-1">Option B</span> {iss.optB}</div>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                💡 {iss.hint}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex justify-center pt-8">
+                                    <button
+                                        disabled={selectedIssueIds.length < 3}
+                                        onClick={() => setPhase('DELIBERATION')}
+                                        className="px-12 py-5 bg-slate-800 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-slate-900 transition-all disabled:opacity-20"
+                                    >
+                                        次へ進む（検討フォーム入力）
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Phase 3: Deliberation Input Form */}
+                        {phase === 'DELIBERATION' && (
+                            <div className="space-y-8 animate-fade-in-up">
+                                <h2 className="text-3xl font-black text-slate-800 tracking-tight">設計決断の言語化</h2>
+                                <p className="text-slate-500">選択した3つの論点に対し、あなたの設計意志を反映させてください。</p>
+
+                                <div className="space-y-12">
+                                    {selectedIssueIds.map(id => {
+                                        const iss = issues.find(i => i.id === id);
+                                        return (
+                                            <div key={id} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                                                <div className="flex items-center space-x-3 mb-2">
+                                                    <span className="bg-indigo-600 text-white w-2 h-8 rounded-full"></span>
+                                                    <h3 className="text-xl font-bold text-slate-800">{iss?.title}</h3>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">採用する案（なぜそれか）</label>
+                                                            <textarea
+                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                                                placeholder="例: Option Aを採用。将来の拡張性を優先するため。"
+                                                                rows={3}
+                                                                value={delibData[id]?.selectedOption || ''}
+                                                                onChange={e => updateDelib(id, 'selectedOption', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">既存サービスとの違い</label>
+                                                            <textarea
+                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                                                placeholder="例: 汎用ツールに比べ、本ドメイン特化のUIで差別化。"
+                                                                rows={3}
+                                                                value={delibData[id]?.differentiator || ''}
+                                                                onChange={e => updateDelib(id, 'differentiator', e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">予想されるFB / 懸念点</label>
+                                                            <textarea
+                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                                                placeholder="例: 初期コストの増大について指摘が入る可能性がある。"
+                                                                rows={3}
+                                                                value={delibData[id]?.expectedFeedback || ''}
+                                                                onChange={e => updateDelib(id, 'expectedFeedback', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">トレードオフの決断</label>
+                                                            <textarea
+                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                                                placeholder="例: パフォーマンスを犠牲にし、開発速度(Time to Market)を取る。"
+                                                                rows={3}
+                                                                value={delibData[id]?.tradeoffDecision || ''}
+                                                                onChange={e => updateDelib(id, 'tradeoffDecision', e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                <div className="bg-slate-800 p-8 rounded-3xl text-white space-y-6">
+                                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                                        <div className="flex-1">
+                                            <h3 className="text-xl font-bold mb-2">FINAL STEP: 報告書の生成</h3>
+                                            <select
+                                                value={reportPromptId}
+                                                onChange={e => setReportPromptId(e.target.value)}
+                                                className="bg-slate-700 border-none rounded-xl text-sm px-4 py-2 w-full max-w-sm outline-none focus:ring-2 focus:ring-teal-400"
+                                            >
+                                                {prompts.filter(p => p.category === 'report' || p.category === 'general').map(p => (
+                                                    <option key={p.id} value={p.id}>{p.title}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <button
+                                            onClick={generateReportPrompt}
+                                            className="px-8 py-4 bg-teal-500 hover:bg-teal-400 text-slate-900 rounded-2xl font-black shadow-lg transition-transform active:scale-95 whitespace-nowrap"
+                                        >
+                                            最終報告書プロンプトを生成
+                                        </button>
+                                    </div>
+
+                                    {generatedStep2Prompt && (
+                                        <div className="space-y-4 animate-fade-in-up">
+                                            <div className="text-xs font-bold opacity-50 uppercase tracking-widest">最終報告書 JSON ペースト</div>
+                                            <textarea
+                                                value={pastedReportJSON}
+                                                onChange={e => handlePasteReport(e.target.value)}
+                                                className="w-full p-4 bg-slate-900 text-teal-400 font-mono text-xs rounded-2xl border border-slate-700 focus:border-teal-400 outline-none transition h-40"
+                                                placeholder={`{"chapter1": "...", ... "chapter5": "..."}`}
+                                            />
+                                            {reportError && <p className="text-red-400 text-xs font-bold">{reportError}</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Phase 4: Result View & PDF */}
+                        {phase === 'RESULT' && finalReport && (
+                            <div className="space-y-8 animate-fade-in-up">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-3xl font-black text-slate-800 tracking-tight">設計報告書の完成</h2>
+                                    <button
+                                        onClick={handleGeneratePDF}
+                                        disabled={isPdfGenerating}
+                                        className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center space-x-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        <span>{isPdfGenerating ? 'PDF生成中...' : '検証ハッシュ付PDFを発行'}</span>
+                                    </button>
+                                </div>
+
+                                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-12">
+                                    <div className="prose prose-slate max-w-none">
+                                        {[
+                                            { t: '第1章：システム要件の概況と設計背景', c: finalReport.chapter1 },
+                                            { t: '第2章：設計上の分岐点と代替案の比較検討', c: finalReport.chapter2 },
+                                            { t: '第3章：主要な差別化要因と既存システムとの整合性', c: finalReport.chapter3 },
+                                            { t: '第4章：ステークホルダーへの公開と予想されるフィードバック', c: finalReport.chapter4 },
+                                            { t: '第5章：最終的なアーキテクチャ方針とトレードオフの決断', c: finalReport.chapter5 },
+                                        ].map((ch, i) => (
+                                            <div key={i} className="mb-12 last:mb-0">
+                                                <h3 className="text-xl font-black text-slate-800 border-b-4 border-teal-500/20 pb-2 mb-6">{ch.t}</h3>
+                                                <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{ch.c}</p>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                            </div>
+                        )}
 
+                    </div>
                 </div>
             </div>
         </div>

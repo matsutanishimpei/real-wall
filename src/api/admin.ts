@@ -93,18 +93,18 @@ adminRoute.get('/prompts', async (c) => {
 });
 
 adminRoute.post('/prompts', async (c) => {
-    const { title, content } = await c.req.json();
+    const { title, content, category } = await c.req.json();
     const db = drizzle(c.env.DB);
-    const [newPrompt] = await db.insert(basePrompts).values({ title, content }).returning();
+    const [newPrompt] = await db.insert(basePrompts).values({ title, content, category }).returning();
     return c.json({ prompt: newPrompt });
 });
 
 adminRoute.put('/prompts/:id', async (c) => {
     const id = c.req.param('id');
-    const { title, content } = await c.req.json();
+    const { title, content, category } = await c.req.json();
     const db = drizzle(c.env.DB);
     const [updatedPrompt] = await db.update(basePrompts)
-        .set({ title, content })
+        .set({ title, content, category, updatedAt: new Date() })
         .where(eq(basePrompts.id, id))
         .returning();
     return c.json({ prompt: updatedPrompt });

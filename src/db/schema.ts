@@ -18,6 +18,7 @@ export const users = sqliteTable('users', {
 export const basePrompts = sqliteTable('base_prompts', {
     id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
     title: text('title').notNull(),
+    category: text('category', { enum: ['extraction', 'report', 'general'] }).default('general').notNull(),
     content: text('content').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
