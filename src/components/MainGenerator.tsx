@@ -47,6 +47,64 @@ export default function MainGenerator({ user }: { user: any }) {
     // --- Others ---
     const [isCopied, setIsCopied] = useState(false);
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    // --- Persistence (Auto-save) ---
+    useEffect(() => {
+        const saved = localStorage.getItem(`realwall-project-${user.id}`);
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                if (data.requirements) setRequirements(data.requirements);
+                if (data.selectedConstraintIds) setSelectedConstraintIds(data.selectedConstraintIds);
+                if (data.extractionPromptId) setExtractionPromptId(data.extractionPromptId);
+                if (data.pastedIssuesJSON) setPastedIssuesJSON(data.pastedIssuesJSON);
+                if (data.issues) setIssues(data.issues);
+                if (data.selectedIssueIds) setSelectedIssueIds(data.selectedIssueIds);
+                if (data.delibData) setDelibData(data.delibData);
+                if (data.reportPromptId) setReportPromptId(data.reportPromptId);
+                if (data.pastedReportJSON) setPastedReportJSON(data.pastedReportJSON);
+                if (data.finalReport) setFinalReport(data.finalReport);
+                if (data.phase) setPhase(data.phase);
+            } catch (e) {
+                console.error("Failed to load saved project", e);
+            }
+        }
+        setIsLoaded(true);
+    }, [user.id]);
+
+    useEffect(() => {
+        if (!isLoaded) return;
+        const data = {
+            requirements, selectedConstraintIds, extractionPromptId,
+            pastedIssuesJSON, issues, selectedIssueIds, delibData,
+            reportPromptId, pastedReportJSON, finalReport, phase
+        };
+        localStorage.setItem(`realwall-project-${user.id}`, JSON.stringify(data));
+    }, [requirements, selectedConstraintIds, extractionPromptId, pastedIssuesJSON, issues, selectedIssueIds, delibData, reportPromptId, pastedReportJSON, finalReport, phase, isLoaded, user.id]);
+
+    const resetProject = () => {
+        if (confirm('プロジェクトを完全にリセットしてもよろしいですか？入力内容はすべて消去されます。')) {
+            setRequirements('');
+            setSelectedConstraintIds([]);
+            setPastedIssuesJSON('');
+            setIssues([]);
+            setSelectedIssueIds([]);
+            setDelibData({});
+            setPastedReportJSON('');
+            setFinalReport(null);
+            setPhase('INPUT');
+            localStorage.removeItem(`realwall-project-${user.id}`);
+        }
+    };
+
+    const canJumpTo = (p: Phase) => {
+        if (p === 'INPUT') return true;
+        if (p === 'ISSUES') return issues.length > 0;
+        if (p === 'DELIBERATION') return selectedIssueIds.length >= 3;
+        if (p === 'RESULT') return finalReport !== null;
+        return false;
+    };
 
     // Initial load
     useEffect(() => {
@@ -186,7 +244,7 @@ export default function MainGenerator({ user }: { user: any }) {
 
         try {
             const textToHash = requirements + JSON.stringify(finalReport);
-            const docHashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(textToHash));
+            const docHashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(textToHash) as unknown as ArrayBuffer);
             const docHash = Array.from(new Uint8Array(docHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 8);
 
             const pdfDoc = await PDFDocument.create();
@@ -254,7 +312,7 @@ export default function MainGenerator({ user }: { user: any }) {
             });
 
             const pdfBytes = await pdfDoc.save();
-            const fileHashBuffer = await crypto.subtle.digest('SHA-256', pdfBytes);
+            const fileHashBuffer = await crypto.subtle.digest('SHA-256', pdfBytes as unknown as ArrayBuffer);
             const fileHash = Array.from(new Uint8Array(fileHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
             await fetch('/api/logs', {
@@ -263,7 +321,7 @@ export default function MainGenerator({ user }: { user: any }) {
                 body: JSON.stringify({ pdfHash: fileHash, considerations: [] }) // considerations could be mapped from delibData
             });
 
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -292,15 +350,21 @@ export default function MainGenerator({ user }: { user: any }) {
                         { step: 'ISSUES', label: '2. 設計論点の抽出' },
                         { step: 'DELIBERATION', label: '3. 設計検討・解決' },
                         { step: 'RESULT', label: '4. 最終報告書' }
-                    ].map((s, i) => (
-                        <React.Fragment key={s.step}>
-                            <div className={`flex items-center space-x-3 transition-all ${phase === s.step ? 'text-teal-600 scale-105 opacity-100' : 'text-slate-400 opacity-60'}`}>
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${phase === s.step ? 'bg-teal-600 text-white shadow-lg' : 'bg-slate-200 text-slate-500'}`}>{i + 1}</div>
-                                <span className={`text-sm font-bold whitespace-nowrap hidden md:inline`}>{s.label}</span>
-                            </div>
-                            {i < 3 && <div className="flex-1 h-px bg-slate-200 mx-4 hidden md:block"></div>}
-                        </React.Fragment>
-                    ))}
+                    ].map((s, i) => {
+                        const clickable = canJumpTo(s.step as Phase);
+                        return (
+                            <React.Fragment key={s.step}>
+                                <div
+                                    onClick={() => clickable && setPhase(s.step as Phase)}
+                                    className={`flex items-center space-x-3 transition-all ${clickable ? 'cursor-pointer' : 'cursor-not-allowed'} ${phase === s.step ? 'text-teal-600 scale-105 opacity-100' : 'text-slate-400 opacity-60'}`}
+                                >
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${phase === s.step ? 'bg-teal-600 text-white shadow-lg' : clickable ? 'bg-teal-100 text-teal-600' : 'bg-slate-200 text-slate-500'}`}>{i + 1}</div>
+                                    <span className={`text-sm font-bold whitespace-nowrap hidden md:inline`}>{s.label}</span>
+                                </div>
+                                {i < 3 && <div className={`flex-1 h-px mx-4 hidden md:block ${canJumpTo(['ISSUES', 'DELIBERATION', 'RESULT'][i] as Phase) ? 'bg-teal-200' : 'bg-slate-200'}`}></div>}
+                            </React.Fragment>
+                        );
+                    })}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -351,7 +415,7 @@ export default function MainGenerator({ user }: { user: any }) {
                                     <div key={category}>
                                         <h3 className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md inline-block mb-3">{category}</h3>
                                         <div className="space-y-2">
-                                            {items.map(item => (
+                                            {(items as any[]).map((item: any) => (
                                                 <label key={item.id} className="flex items-start space-x-3 cursor-pointer group">
                                                     <input
                                                         type="checkbox"
@@ -372,14 +436,27 @@ export default function MainGenerator({ user }: { user: any }) {
                         </div>
 
                         {/* Reset / Navigation Back */}
-                        {phase !== 'INPUT' && (
+                        <div className="space-y-3">
+                            {phase !== 'INPUT' && (
+                                <button
+                                    onClick={() => {
+                                        const prevPhase = phase === 'ISSUES' ? 'INPUT' : phase === 'DELIBERATION' ? 'ISSUES' : 'DELIBERATION';
+                                        setPhase(prevPhase);
+                                    }}
+                                    className="w-full py-3 bg-white border-2 border-slate-200 rounded-2xl text-slate-600 font-bold hover:bg-slate-50 transition flex items-center justify-center space-x-2 shadow-sm"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                                    <span>前の工程に戻る</span>
+                                </button>
+                            )}
                             <button
-                                onClick={() => setPhase('INPUT')}
-                                className="w-full py-3 border-2 border-dashed border-slate-300 rounded-2xl text-slate-400 font-bold hover:bg-white hover:text-slate-600 transition"
+                                onClick={resetProject}
+                                className="w-full py-3 border-2 border-dashed border-red-200 hover:border-red-300 rounded-2xl text-red-400 font-bold hover:bg-red-50 transition flex items-center justify-center space-x-2"
                             >
-                                ← 最初からやり直す
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                <span>プロジェクトをリセット</span>
                             </button>
-                        )}
+                        </div>
                     </div>
 
                     {/* ===== RIGHT: Step Output & Interaction ===== */}
