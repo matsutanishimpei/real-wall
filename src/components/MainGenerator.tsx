@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 
 // Interface definitions
@@ -250,7 +250,13 @@ export default function MainGenerator({ user }: { user: any }) {
             const pdfDoc = await PDFDocument.create();
             pdfDoc.registerFontkit(fontkit);
 
-            const fontRes = await fetch('https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf');
+            let fontRes;
+            try {
+                fontRes = await fetch('https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf');
+                if (!fontRes.ok) throw new Error(`Font status: ${fontRes.status}`);
+            } catch (fontErr) {
+                throw new Error('日本語フォントの読み込みに失敗しました。ネットワーク接続を確認してください。');
+            }
             const fontBytes = await fontRes.arrayBuffer();
             const customFont = await pdfDoc.embedFont(fontBytes);
 
@@ -276,16 +282,18 @@ export default function MainGenerator({ user }: { user: any }) {
             const { width, height } = page.getSize();
             let y = height - 50;
 
-            const drawText = (text: string, size: number, isTitle = false) => {
-                const color = isTitle ? { r: 0.1, g: 0.3, b: 0.3 } : { r: 0.2, g: 0.2, b: 0.2 };
-                const lines = wrapText(text, width - 100, size);
+            const drawText = (text: string = '', size: number, isTitle = false) => {
+                const safeText = text || '';
+                const lines = wrapText(safeText, width - 100, size);
+                const colorValue = isTitle ? rgb(0.1, 0.3, 0.3) : rgb(0.2, 0.2, 0.2);
+
                 for (const line of lines) {
                     if (y < 60) {
                         page = pdfDoc.addPage();
                         y = height - 50;
                         page.drawText(`Verify: ${docHash}`, { x: width - 80, y: 30, size: 8, font: customFont });
                     }
-                    page.drawText(line, { x: 50, y, size, font: customFont, color: { type: 'RGB' as any, ...color } as any });
+                    page.drawText(line, { x: 50, y, size, font: customFont, color: colorValue });
                     y -= size + 5;
                 }
                 y -= 12;
@@ -307,7 +315,7 @@ export default function MainGenerator({ user }: { user: any }) {
 
             chapters.forEach(ch => {
                 drawText(ch.t, 14, true);
-                drawText(ch.c, 11);
+                drawText(ch.c || '(記述なし)', 11);
                 y -= 10;
             });
 
@@ -329,9 +337,9 @@ export default function MainGenerator({ user }: { user: any }) {
             a.click();
             URL.revokeObjectURL(url);
 
-        } catch (e) {
-            console.error(e);
-            alert('PDF出力エラーが発生しました');
+        } catch (e: any) {
+            console.error('PDF Generation Error:', e);
+            alert(`PDF出力エラーが発生しました: ${e.message || '不明なエラー'}`);
         } finally {
             setIsPdfGenerating(false);
         }
