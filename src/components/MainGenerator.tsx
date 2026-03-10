@@ -101,7 +101,7 @@ export default function MainGenerator({ user }: { user: any }) {
     const canJumpTo = (p: Phase) => {
         if (p === 'INPUT') return true;
         if (p === 'ISSUES') return issues.length > 0;
-        if (p === 'DELIBERATION') return selectedIssueIds.length >= 3;
+        if (p === 'DELIBERATION') return selectedIssueIds.length >= 5;
         if (p === 'RESULT') return finalReport !== null;
         return false;
     };
@@ -185,7 +185,7 @@ export default function MainGenerator({ user }: { user: any }) {
     const handleToggleIssue = (id: string) => {
         setSelectedIssueIds(prev => {
             if (prev.includes(id)) return prev.filter(x => x !== id);
-            if (prev.length >= 3) return prev; // Limit to 3
+            if (prev.length >= 5) return prev; // Limit to 5
             return [...prev, id];
         });
     };
@@ -506,10 +506,10 @@ export default function MainGenerator({ user }: { user: any }) {
                                 <div className="flex justify-between items-end">
                                     <div>
                                         <h2 className="text-3xl font-black text-slate-800 tracking-tight">設計論点の検討</h2>
-                                        <p className="text-slate-500 mt-2">提示された論点から、このプロジェクトで深く検討すべきものを<strong className="text-indigo-600">3つ</strong>選択してください。</p>
+                                        <p className="text-slate-500 mt-2">提示された論点から、このプロジェクトで深く検討すべきものを<strong className="text-indigo-600">5つ</strong>選択してください。</p>
                                     </div>
                                     <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-sm font-black border border-indigo-100">
-                                        選択中: {selectedIssueIds.length} / 3
+                                        選択中: {selectedIssueIds.length} / 5
                                     </div>
                                 </div>
 
@@ -539,7 +539,7 @@ export default function MainGenerator({ user }: { user: any }) {
 
                                 <div className="flex justify-center pt-8">
                                     <button
-                                        disabled={selectedIssueIds.length < 3}
+                                        disabled={selectedIssueIds.length < 5}
                                         onClick={() => setPhase('DELIBERATION')}
                                         className="px-12 py-5 bg-slate-800 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-slate-900 transition-all disabled:opacity-20"
                                     >
@@ -553,7 +553,7 @@ export default function MainGenerator({ user }: { user: any }) {
                         {phase === 'DELIBERATION' && (
                             <div className="space-y-8 animate-fade-in-up">
                                 <h2 className="text-3xl font-black text-slate-800 tracking-tight">設計決断の言語化</h2>
-                                <p className="text-slate-500">選択した3つの論点に対し、あなたの設計意志を反映させてください。</p>
+                                <p className="text-slate-500">選択した5つの論点に対し、あなたの設計意志を反映させてください。</p>
 
                                 <div className="space-y-12">
                                     {selectedIssueIds.map(id => {
