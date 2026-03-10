@@ -1,21 +1,72 @@
-```txt
+# 🧱 Real Wall (リアルウォール)
+### アーキテクチャ設計・要件検討支援ツール
+
+「Real Wall」は、システム開発における「要件」と「制約（壁）」を戦わせ、設計者の思考を介在させることで、より堅牢で意志の宿ったアーキテクチャ設計を支援するツールです。
+
+AIが一方的に答えを出すのではなく、設計者に「論点」を突きつけ、人間が回答することで重厚な設計報告書（ハッシュ付きPDF）を生成します。
+
+---
+
+## 🚀 主な機能
+
+### 1. 2ステップ型・協働設計ワークフロー
+単なる生成AIではなく、人間の思考プロセスを支援する動線を実装しています。
+- **STEP 1: 論点の抽出**
+  - 要件と制約（壁）をLLMに流し込み、技術的なトレードオフや不確実な「デザインの分岐点」を5つ抽出します。
+- **STEP 2: 設計者の意思決定**
+  - 抽出された論点に対し、設計者が自らの意志（採用案、既存との違い、トレードオフの決断）を入力します。
+- **STEP 3: 最終報告書（PDF）の発行**
+  - 入力されたすべての思考ログを統合し、A4 5〜10枚相当の重厚な5章構成レポートを生成・PDF発行します。
+
+### 2. 管理者ダッシュボード
+- **プロンプト管理**: カテゴリ（論点抽出用・報告書生成用）に応じたプロンプトのCRUD管理。
+- **制約（壁）マスター管理**: 設計を困難にする「壁」データの追加・編集。
+- **ユーザー管理**: 利用ユーザーの権限（Admin/User）および有効状態の管理。
+
+### 3. 設計の永続化と検証
+- **localStorage オートセーブ**: ログイン中、入力内容はリアルタイムで保存され、リロード後も続きから再開可能。
+- **検証ハッシュ機能**: 発行されるPDFには生成データのハッシュが付与され、管理者が改ざんを検証できる機能を搭載。
+
+---
+
+## 🛠 テックスタック
+
+- **Frontend**: Vite + React + Tailwind CSS
+- **Backend**: Hono (Cloudflare Workers)
+- **Database**: Cloudflare D1 (SQLite)
+- **ORM**: Drizzle ORM
+- **PDF Generation**: pdf-lib
+- **Font Integration**: @pdf-lib/fontkit (Noto Sans CJK JP)
+
+---
+
+## 📦 セットアップ
+
+### ローカル開発
+```bash
+# 依存関係のインストール
 npm install
+
+# 開発サーバーの起動
 npm run dev
 ```
 
-```txt
+### データベースのマイグレーション
+```bash
+# ローカルDBへの適用
+npx wrangler d1 migrations apply real-wall-db --local
+
+# リモート（Cloudflare）への適用
+npx wrangler d1 migrations apply real-wall-db --remote
+```
+
+### デプロイ
+```bash
 npm run deploy
 ```
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
+---
 
-```txt
-npm run cf-typegen
-```
-
-Pass the `CloudflareBindings` as generics when instantiation `Hono`:
-
-```ts
-// src/index.ts
-const app = new Hono<{ Bindings: CloudflareBindings }>()
-```
+## 📝 開発の背景
+システム設計において、制約がない状態での生成AIは、しばしば「ありきたりな正解」しか出しません。
+Real Wallは、あえて厳しい制約（壁）をぶつけることで、設計者のエンジニアリング・スピリッツを揺さぶり、真に価値のあるアーキテクチャを導き出すために誕生しました。
