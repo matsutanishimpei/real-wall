@@ -6,7 +6,8 @@
     "build": "vite build --mode client && vite build",
     "preview": "wrangler pages dev",
     "deploy": "npm run build && wrangler pages deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "test": "tsc --noEmit"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
